@@ -29,6 +29,8 @@ ConnectionConsole::ConnectionConsole() {
     m_lpCSBuffer = NULL;
     m_nQueueBufferLength = 0;
     m_nTO = 1;
+	m_netbuf = NULL;
+	m_netbufsize = 0;
 
     m_filezipbuf = NULL;
     m_filezipbufsize = 0;
@@ -58,57 +60,73 @@ int ConnectionConsole::Startup(PConsoleCmd open){
     _tcsncpy_s(m_clearPasswd, opendata->pass, min(_countof(m_host), _tcslen(opendata->pass)));
     if (0 != opendata->port) m_port = opendata->port;
 
-    WORD wVersionRequested = MAKEWORD(2, 0);
-    WSADATA wsaData;
-    int ret = WSAStartup(wVersionRequested, &wsaData);
-    if ( ret != 0) {
-        vnclog.Print(0, GETMSG(INIT_WSASTARTUP), ret);
-        return INIT_WSASTARTUP;
-    }
+	try {
+		WORD wVersionRequested = MAKEWORD(2, 0);
+		WSADATA wsaData;
+		int ret = WSAStartup(wVersionRequested, &wsaData);
+		if (ret != 0) {
+			vnclog.Print(0, GETMSG(INIT_WSASTARTUP), ret);
+			return INIT_WSASTARTUP;
+		}
 
-    struct sockaddr_in thataddr;
-    if (m_sock != NULL && m_sock != INVALID_SOCKET) {
-        // —ˆ‚È‚¢‚Í‚¸
-        closesocket(m_sock);
-    }
-    m_sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (m_sock == INVALID_SOCKET) {
-        vnclog.Print(0, GETMSG(INIT_CREATE_SOCKET_ERR), WSAGetLastError());
-        return INIT_CREATE_SOCKET_ERR;
-    }
+		struct sockaddr_in thataddr;
+		if (m_sock != NULL && m_sock != INVALID_SOCKET) {
+			// —ˆ‚È‚¢‚Í‚¸
+			closesocket(m_sock);
+		}
+		m_sock = socket(PF_INET, SOCK_STREAM, 0);
+		if (m_sock == INVALID_SOCKET) {
+			vnclog.Print(0, GETMSG(INIT_CREATE_SOCKET_ERR), WSAGetLastError());
+			return INIT_CREATE_SOCKET_ERR;
+		}
 
-    thataddr.sin_addr.s_addr = inet_addr(m_host);
-    if (thataddr.sin_addr.s_addr == INADDR_NONE) {
-        LPHOSTENT lphost;
-        lphost = gethostbyname(m_host);
-        if (lphost == NULL){
-            vnclog.Print(0, GETMSG(INIT_GETHOST_ERR), WSAGetLastError());
-            return INIT_GETHOST_ERR;
-        };
-        thataddr.sin_addr.s_addr = ((LPIN_ADDR)lphost->h_addr)->s_addr;
-    };
+		thataddr.sin_addr.s_addr = inet_addr(m_host);
+		if (thataddr.sin_addr.s_addr == INADDR_NONE) {
+			LPHOSTENT lphost;
+			lphost = gethostbyname(m_host);
+			if (lphost == NULL){
+				vnclog.Print(0, GETMSG(INIT_GETHOST_ERR), WSAGetLastError());
+				return INIT_GETHOST_ERR;
+			};
+			thataddr.sin_addr.s_addr = ((LPIN_ADDR)lphost->h_addr)->s_addr;
+		};
 
-    thataddr.sin_family = AF_INET;
-    thataddr.sin_port = htons(m_port);
-    ret = connect(m_sock, (LPSOCKADDR)&thataddr, sizeof(thataddr));
-    if (ret == SOCKET_ERROR) {
-        // ??
-        //if (WSA_INVALID_HANDLE == WSAGetLastError()) {
-        //    Sleep(5000);
-        //}
-        vnclog.Print(0, GETMSG(INIT_CONNECT_ERR), WSAGetLastError());
-        return INIT_CONNECT_ERR;
-    }
+		thataddr.sin_family = AF_INET;
+		thataddr.sin_port = htons(m_port);
+		ret = connect(m_sock, (LPSOCKADDR)&thataddr, sizeof(thataddr));
+		if (ret == SOCKET_ERROR) {
+			// ??
+			//if (WSA_INVALID_HANDLE == WSAGetLastError()) {
+			//    Sleep(5000);
+			//}
+			vnclog.Print(0, GETMSG(INIT_CONNECT_ERR), WSAGetLastError());
+			return INIT_CONNECT_ERR;
+		}
 
-    BOOL nodelayval = TRUE;
-    if (setsockopt(m_sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&nodelayval, sizeof(BOOL))) {
-        vnclog.Print(0, GETMSG(INIT_SETSOCKET_ERR), WSAGetLastError());
-        return INIT_SETSOCKET_ERR;
-    }
-    fis = new rdr::FdInStream(m_sock);
-    fis->SetDSMMode(false);  // ‚Æ‚è‚ ‚¦‚¸
-    
-    return HandShake();
+		BOOL nodelayval = TRUE;
+		if (setsockopt(m_sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&nodelayval, sizeof(BOOL))) {
+			vnclog.Print(0, GETMSG(INIT_SETSOCKET_ERR), WSAGetLastError());
+			return INIT_SETSOCKET_ERR;
+		}
+		fis = new rdr::FdInStream(m_sock);
+		fis->SetDSMMode(false);  // ‚Æ‚è‚ ‚¦‚¸
+
+		m_ret = HandShake();
+	}
+	catch (ExceptionConsole &c) {
+		vnclog.Print(0, _T("Exception : %s\n"), c.m_info);
+		m_ret = 91;
+	}
+	catch (rdr::Exception &e) {
+		vnclog.Print(0, "rdr::Exception (1): %s\n", e.str());
+		m_ret = 92;
+	}
+	catch (...){
+		vnclog.Print(0, "Exception \n");
+		m_ret = 93;
+	}
+
+	return m_ret;
 }
 
 int ConnectionConsole::Cleanup(){
