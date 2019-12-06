@@ -37,18 +37,29 @@ int _tmain(int argc, TCHAR* argv[]) {
 
     // チェックの場合は、チェック＆Exit
     int ret = 0;
+    int chkng = 1;
     PConsoleCmd cmd = NULL;
-    while (GetNextCommand(cmd)) {
-        if (cmd->no == CMD_CHECK) {
-            if (vncopt.m_mode != MD_CHECK) continue;
-        } else {
-            if (vncopt.m_mode == MD_CHECK) continue;
+    if (vncopt.m_mode == MD_CHECK) {
+        // チェックモード
+        int chkret = 0;
+        while (GetNextCommand(cmd)) {
+            if (cmd->no != CMD_CHECK) continue;
+            // コマンド実施
+            chkng *= 2; // 行数の２乗
+            chkret = console.ExecCmd(cmd->no, &cmd->data);
+            if (0 != chkret) {
+                ret += chkng; // 何個目のコマンドが失敗したかを返す（処理は続行）
+            }
         }
-
-        // コマンド実施
-        ret = console.ExecCmd(cmd->no, &cmd->data);
-        if (/* StopWhenFail && */ 0 != ret) {
-            break;
+    } else {
+        // 通常モード
+        while (GetNextCommand(cmd)) {
+            if (cmd->no == CMD_CHECK) continue;
+            // コマンド実施
+            ret = console.ExecCmd(cmd->no, &cmd->data);
+            if (/* StopWhenFail && */ 0 != ret) {
+                break;
+            }
         }
     }
 

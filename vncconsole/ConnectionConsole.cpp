@@ -17,6 +17,29 @@ extern "C" {
 extern LogConsole vnclog;
 
 ConnectionConsole::ConnectionConsole() {
+    m_BytesSend = 0;
+    m_BytesRead = 0;
+    m_majorVersion = 0;
+    m_minorVersion = 0;
+    new_ultra_server = false;
+    m_fServerKnowsFileTransfer = FALSE;
+    memset(&m_si, 0, sizeof(m_si));
+    m_desktopName = NULL;
+    m_hSrcFile = NULL;
+    m_dwNbBytesRead = 0;
+    m_dwTotalNbBytesRead = 0;
+    m_fEof = false;
+    m_fFileUploadError = false;
+    m_fFileUploadRunning = false;
+    m_fSendFileChunk = false;
+    m_fCompress = false;
+    m_nCSOffset = 0;
+    m_nCSBufferSize = 0;
+    m_nnFileSize = 0;
+    m_dwCurrentValue = 0;
+    m_dwCurrentPercent = 0;
+    m_dwStartTick = 0;
+
     m_port = 5900; // portŒÅ’è
     m_passwordfailed = true;
     m_ServerFTProtocolVersion = FT_PROTO_VERSION_3;
@@ -922,7 +945,6 @@ bool ConnectionConsole::OfferLocalFile(PVOID para) {
     GetFriendlyFileSizeString(n2SrcSize.QuadPart, szFFS);
 
     m_nnFileSize = n2SrcSize.QuadPart;
-    //SetGauge(hWnd, 0); // In bytes
 
     // Add the File Time Stamp to the filename
     FILETIME SrcFileModifTime;
@@ -967,6 +989,7 @@ bool ConnectionConsole::OfferLocalFile(PVOID para) {
     }
     m_nCSOffset = 0;
     m_nCSBufferSize = 0;
+    SetGauge(0); // In bytes
 
     // Send the FileTransferMsg with rfbFileTransferOffer
     // So the server creates the appropriate new file on the other side
@@ -1056,8 +1079,9 @@ bool ConnectionConsole::ReceiveDestinationFileChecksums(int nSize, int nLen){
         return false;
     }
 
-    // char szStatus[255];
-    // sprintf(szStatus, " Receiving %d bytes of file checksums from remote machine. Please wait...", nLen); 
+    //char szStatus[255];
+    //sprintf(szStatus, " Receiving %d bytes of file checksums from remote machine. Please wait...", nLen); 
+    //vnclog.Print(0, szStatus);
     // SetStatus(szStatus);
 
     memset(m_lpCSBuffer, '\0', nLen + 1); // nSize
@@ -1095,14 +1119,14 @@ bool ConnectionConsole::MyGetFileSize(char* szFilePath, ULARGE_INTEGER *n2FileSi
 }
 bool ConnectionConsole::SetSendTimeout(int msecs) {
     //int timeout = msecs < 0 ? m_opts.m_FTTimeout * 1000 : msecs;
-    int timeout = msecs < 0 ? FT_RECV_TIMEOUT * 1000 : msecs;
+    int timeout = msecs < 0 ? FT_RECV_TIMEOUT_CSL * 1000 : msecs;
     if (setsockopt(m_sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, sizeof(timeout)) == SOCKET_ERROR) {
         return false;
     }
     return true;
 }
 bool ConnectionConsole::SetRecvTimeout(int msecs) {
-    int timeout = msecs < 0 ? FT_RECV_TIMEOUT * 1000 : msecs;
+    int timeout = msecs < 0 ? FT_RECV_TIMEOUT_CSL * 1000 : msecs;
     if (setsockopt(m_sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)) == SOCKET_ERROR) {
         return false;
     }

@@ -12,6 +12,8 @@
 #define FT_PROTO_VERSION_2   2  // base ft protocol
 #define FT_PROTO_VERSION_3   3  // new ft protocol session messages
 
+#define FT_RECV_TIMEOUT_CSL    60
+
 class CZipUnZip32;
 namespace rdr { class InStream; class FdInStream; class ZlibInStream; }
 
@@ -60,7 +62,7 @@ protected:
     HANDLE m_hSrcFile;
     char m_szSrcFileName[MAX_PATH + 32];
     unsigned char *m_filechunkbuf;
-    int m_filechunkbufsize = 0;
+    int m_filechunkbufsize;
     DWORD m_dwNbBytesRead;
     __int64 m_dwTotalNbBytesRead;
     bool m_fEof;
